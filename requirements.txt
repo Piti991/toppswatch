@@ -1,0 +1,5 @@
+requests>=2.31
+PyYAML>=6.0
+beautifulsoup4>=4.12
+# Optional: only needed if Topps ever puts the store behind bot detection.
+# curl_cffi>=0.7

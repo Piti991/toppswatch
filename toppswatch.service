@@ -1,0 +1,29 @@
+# Bare-metal / LXC install:
+#   sudo cp toppswatch.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now toppswatch
+[Unit]
+Description=Topps Espana restock monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=toppswatch
+WorkingDirectory=/opt/toppswatch
+ExecStart=/opt/toppswatch/.venv/bin/python -m toppswatch.main --config /opt/toppswatch/config.yaml run
+Restart=always
+RestartSec=30
+EnvironmentFile=-/opt/toppswatch/.env
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/toppswatch/data
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

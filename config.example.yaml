@@ -1,0 +1,97 @@
+# toppswatch — copy to config.yaml and edit.
+# Secrets can be written as ${ENV_VAR} and supplied via the environment.
+
+site:
+  base_url: https://es.topps.com
+  product_path: /products/{handle}
+  # Pages crawled to discover new products. The storefront only renders 24
+  # items server-side, so the sitemap is the reliable source of the full list.
+  collections:
+    - /collections/all-products
+    - /collections
+  sitemaps:
+    - /sitemap.xml
+
+watch:
+  # Case/accent-insensitive regex matched against the product slug.
+  patterns:
+    - chrome
+  # Anything matching these is dropped even if it matched above.
+  exclude_patterns:
+    - sleeve
+    - top ?loader
+    - album
+    - binder
+    - toploader
+  # Pin specific products here. Copy slugs from `discover` output.
+  # These are always watched, whether or not discovery finds them.
+  handles: []
+    # - 2026-topps-chrome%C2%AE-baseball-hobby-box
+    # - 2026-topps-chrome%C2%AE-baseball-mega-box
+  auto_discover: true
+  discover_every_minutes: 30
+  max_products: 60
+
+polling:
+  # Seconds between full sweeps. 60 is responsive without being abusive.
+  # Below 20 the config is rejected.
+  interval_seconds: 60
+  jitter_percent: 20          # randomises the interval so you aren't a metronome
+  concurrency: 3              # parallel product fetches
+  per_request_delay_ms: 250   # random stagger inside a cycle
+  timeout_seconds: 20
+  retries: 3
+  backoff: 2.0
+  rate_limit_cooldown_seconds: 900   # pause this long after a 403/429
+  # Set to "chrome124" and install curl_cffi if you start getting blocked.
+  impersonate: null
+  proxy: null
+  strategies: [json-ld, meta, embedded-json, text]
+
+alerts:
+  # Don't re-alert for the same product within this window.
+  min_alert_interval_seconds: 1800
+  # If true, alerts the first time a product is seen in stock, even with no
+  # prior baseline. Leave false to avoid a burst of alerts on first run.
+  alert_on_first_sight: false
+  notify_on_new_product: true
+
+state_file: ./data/state.json
+log_level: INFO
+
+notifications:
+  # ---- ntfy: easiest option. Install the ntfy app, subscribe to your topic.
+  # Pick a long random topic name — anyone who knows it can read your alerts.
+  ntfy:
+    enabled: true
+    server: https://ntfy.sh
+    topic: ${NTFY_TOPIC:-topps-chrome-CHANGE-ME-8f3a91}
+    # token: ${NTFY_TOKEN}
+
+  # ---- Telegram: create a bot with @BotFather, get your chat id from @userinfobot
+  telegram:
+    enabled: false
+    bot_token: ${TELEGRAM_BOT_TOKEN}
+    chat_id: ${TELEGRAM_CHAT_ID}
+
+  # ---- Home Assistant: create a webhook trigger automation that fires a
+  # notify.mobile_app_* action. See README for the automation YAML.
+  home_assistant:
+    enabled: false
+    webhook_url: http://192.168.86.50:8123/api/webhook/topps_restock
+
+  email:
+    enabled: false
+    host: smtp.gmail.com
+    port: 587
+    starttls: true
+    username: ${SMTP_USER}
+    password: ${SMTP_PASS}
+    from_addr: ${SMTP_USER}
+    to_addrs:
+      - you@example.com
+
+  webhook:
+    enabled: false
+    url: https://example.com/hook
+    headers: {}

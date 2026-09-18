@@ -1,0 +1,19 @@
+services:
+  toppswatch:
+    build: .
+    image: toppswatch:latest
+    container_name: toppswatch
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Gibraltar
+      NTFY_TOPIC: ${NTFY_TOPIC}
+      # TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      # TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./data:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
