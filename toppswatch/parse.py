@@ -33,6 +33,12 @@ IN_STOCK_MARKERS = [
     "anadir a la cesta",
     "anadir rapido",
     "add to cart",
+    "anadir al carrito",
+    "in den warenkorb",
+    "reservar ahora",
+    "vorbestellen",
+    "reservar",
+    "hay existencias",
     "add to bag",
     "quick add",
     "comprar ahora",
@@ -41,6 +47,8 @@ IN_STOCK_MARKERS = [
 
 OUT_OF_STOCK_MARKERS = [
     "agotado",
+    "ausverkauft",
+    "nicht verfugbar",
     "sold out",
     "sin existencias",
     "sin stock",
@@ -297,15 +305,23 @@ def from_text_markers(html: str) -> StockResult:
             result.evidence = f"{oos_hit!r} precedes {in_hit!r}"
         result.notes.append("both in-stock and out-of-stock markers present")
 
-    price = re.search(r"[€$£]\s?\d[\d.,]*", text_norm)
-    if price:
-        result.price = price.group(0).replace(" ", "")
     return result
 
 
 # --------------------------------------------------------------------------
 # Public entry point
 # --------------------------------------------------------------------------
+
+
+_MIN_PRICE = re.compile(
+    r'\\?"minVariantPrice\\?"\s*:\s*{\s*\\?"amount\\?"\s*:\s*\\?"([\d.]+)\\?"'
+)
+
+
+def extract_price(html: str) -> str | None:
+    """Real product price from the Shopify payload, not the first euro on the page."""
+    m = _MIN_PRICE.search(html)
+    return f"\u20ac{m.group(1)}" if m else None
 
 
 def extract_title(html: str) -> str | None:
@@ -348,7 +364,7 @@ def detect_stock(html: str, handle: str | None = None, strategies: list[str] | N
             fallback.price = result.price
         if result.conclusive:
             result.title = result.title or fallback.title or extract_title(html)
-            result.price = result.price or fallback.price
+            result.price = result.price or extract_price(html)
             result.notes = notes
             return result
 
@@ -364,10 +380,17 @@ def detect_stock(html: str, handle: str | None = None, strategies: list[str] | N
 PRODUCT_HREF = re.compile(r'/products/([A-Za-z0-9%\u00ae\u2122._~\-]+)')
 
 
-def discover_handles(html: str) -> list[str]:
+def _href_re(segment=None):
+    if not segment:
+        return PRODUCT_HREF
+    seg = segment.strip('/')
+    return re.compile(r'/' + re.escape(seg) + PRODUCT_HREF.pattern.split('/products', 1)[1])
+
+
+def discover_handles(html: str, segment=None) -> list[str]:
     """Pull unique /products/<handle> slugs out of a listing or sitemap page."""
     seen: dict[str, None] = {}
-    for match in PRODUCT_HREF.finditer(html):
+    for match in _href_re(segment).finditer(html):
         handle = match.group(1).strip().rstrip("/")
         if not handle or handle.endswith((".js", ".css", ".json", ".map")):
             continue

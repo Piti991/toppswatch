@@ -1,0 +1,10 @@
+.env
+config.yaml
+*.yaml.bak
+data/
+.venv/
+__pycache__/
+*.pyc
+*.bak
+*.bak[0-9]
+toppswatch.bak.*/

@@ -1,0 +1,20 @@
+{
+  "name": "cardcosmos.de",
+  "base_url": "https://cardcosmos.de",
+  "collections": [
+    "pokemon-booster-displays",
+    "pokemon-elite-trainer-boxen",
+    "pokemon-booster-kaufen",
+    "pokemon-kollektionen",
+    "pokemon-blister",
+    "pokemon-booster-bundle",
+    "pokemon-kampfdeck",
+    "pokemon-30th-celebration",
+    "pokemon-figuren-sammelfiguren"
+  ],
+  "state_file": "/opt/toppswatch/data/cardcosmos.json",
+  "interval": 300,
+  "delay": 1.5,
+  "min_alert_interval": 1800,
+  "notify_new": true
+}

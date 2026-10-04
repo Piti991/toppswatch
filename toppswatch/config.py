@@ -12,6 +12,7 @@ DEFAULTS = {
     "site": {
         "base_url": "https://es.topps.com",
         "product_path": "/products/{handle}",
+        "product_segment": None,
         "collections": ["/collections/all-products"],
         "sitemaps": ["/sitemap.xml"],
     },

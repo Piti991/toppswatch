@@ -56,6 +56,7 @@ def pretty_handle(handle: str) -> str:
 def discover(config: dict, fetcher: Fetcher) -> list[str]:
     """Find every product handle matching the watch patterns."""
     base = config["site"]["base_url"].rstrip("/")
+    segment = config["site"].get("product_segment")
     patterns = config["watch"]["patterns"]
     excludes = config["watch"]["exclude_patterns"]
 
@@ -79,7 +80,7 @@ def discover(config: dict, fetcher: Fetcher) -> list[str]:
         if result.status >= 400:
             log.debug("discovery source %s returned HTTP %s", url, result.status)
             continue
-        for handle in discover_handles(result.text):
+        for handle in discover_handles(result.text, segment):
             found.setdefault(handle, None)
         if url.endswith(".xml"):
             import re
@@ -89,7 +90,7 @@ def discover(config: dict, fetcher: Fetcher) -> list[str]:
     for url in nested_sitemaps[:10]:
         try:
             result = fetcher.get(url)
-            for handle in discover_handles(result.text):
+            for handle in discover_handles(result.text, segment):
                 found.setdefault(handle, None)
         except Exception as exc:  # noqa: BLE001
             log.debug("nested sitemap %s failed: %s", url, exc)
@@ -190,7 +191,7 @@ def run_cycle(config: dict, fetcher: Fetcher, store: Store, notifier: Notifier,
                     title=f"IN STOCK: {display}",
                     message=(
                         f"{display}{price_str}\n"
-                        f"Just came back in stock on Topps España.\n"
+                        f"Just came back in stock on {site_name(config)}.\n"
                         f"Detected {datetime.now(timezone.utc).strftime('%H:%M:%S UTC')} via {method}."
                     ),
                     url=url,
@@ -213,13 +214,58 @@ def run_cycle(config: dict, fetcher: Fetcher, store: Store, notifier: Notifier,
 # --------------------------------------------------------------------------
 
 
+def site_name(config: dict) -> str:
+    name = config["site"].get("name")
+    if name:
+        return name
+    from urllib.parse import urlparse
+    host = urlparse(config["site"]["base_url"]).netloc
+    return host[4:] if host.startswith("www.") else host
+
+
+def announce_new(config: dict, notifier, added: list, known: set) -> int:
+    sent = 0
+    for handle in added:
+        if handle in known:
+            continue
+        notifier.send(Alert(
+            title=f"NEW on {site_name(config)}: {pretty_handle(handle)}",
+            message=f"A new matching product appeared on {site_name(config)}. Now being monitored.",
+            url=product_url(config, handle),
+            priority="default",
+            tags=["new"],
+        ))
+        sent += 1
+    return sent
+
+
 def cmd_run(config: dict, args) -> int:
     fetcher = _make_fetcher(config)
     store = Store(config["state_file"])
     notifier = Notifier(config["notifications"])
     log.info("notification channels: %s", ", ".join(notifier.channel_names) or "NONE")
 
-    watchlist = resolve_watchlist(config, fetcher, cached=list(store.products))
+    watchlist = []
+    for attempt in range(1, 7):
+        try:
+            watchlist = resolve_watchlist(config, fetcher, cached=list(store.products))
+            break
+        except RateLimited as exc:
+            cached = list(store.products)
+            if cached:
+                log.warning("discovery blocked (HTTP %s) — using %d cached products",
+                            exc.status, len(cached))
+                watchlist = cached
+                break
+            wait = min(900, 60 * attempt)
+            log.warning("discovery blocked (HTTP %s), attempt %d — retrying in %ds",
+                        exc.status, attempt, wait)
+            _sleep_interruptible(wait)
+            if _shutdown:
+                return 0
+    if not watchlist:
+        log.error("could not build a watchlist — exiting")
+        return 1
     log.info("watching %d products", len(watchlist))
     for handle in watchlist:
         log.debug("  - %s", handle)
@@ -255,16 +301,7 @@ def cmd_run(config: dict, args) -> int:
             if added:
                 log.info("discovery added %d new product(s): %s", len(added), added)
                 if config["alerts"]["notify_on_new_product"]:
-                    for handle in added:
-                        if handle in known:
-                            continue
-                        notifier.send(Alert(
-                            title=f"New Chrome product listed: {pretty_handle(handle)}",
-                            message="A new matching product appeared on Topps España. Now being monitored.",
-                            url=product_url(config, handle),
-                            priority="default",
-                            tags=["new"],
-                        ))
+                    announce_new(config, notifier, added, known)
             watchlist = refreshed
             known |= set(watchlist)
 
@@ -287,7 +324,27 @@ def cmd_once(config: dict, args) -> int:
     fetcher = _make_fetcher(config)
     store = Store(config["state_file"])
     notifier = Notifier(config["notifications"])
-    watchlist = resolve_watchlist(config, fetcher, cached=list(store.products))
+    watchlist = []
+    for attempt in range(1, 7):
+        try:
+            watchlist = resolve_watchlist(config, fetcher, cached=list(store.products))
+            break
+        except RateLimited as exc:
+            cached = list(store.products)
+            if cached:
+                log.warning("discovery blocked (HTTP %s) — using %d cached products",
+                            exc.status, len(cached))
+                watchlist = cached
+                break
+            wait = min(900, 60 * attempt)
+            log.warning("discovery blocked (HTTP %s), attempt %d — retrying in %ds",
+                        exc.status, attempt, wait)
+            _sleep_interruptible(wait)
+            if _shutdown:
+                return 0
+    if not watchlist:
+        log.error("could not build a watchlist — exiting")
+        return 1
     log.info("watching %d products", len(watchlist))
     stats = run_cycle(config, fetcher, store, notifier, watchlist, debug=True)
     log.info("done: %s", stats)

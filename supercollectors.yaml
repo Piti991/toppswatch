@@ -1,0 +1,36 @@
+site:
+  base_url: https://www.supercollectors.es
+  product_path: /producto/{handle}/
+  product_segment: producto
+  collections:
+    - /categoria-producto/boxes-packs/
+  sitemaps:
+    - /wp-sitemap.xml
+
+watch:
+  patterns: ["^2026.*topps", "pokemon.*(booster box|elite trainer|etb)"]
+  exclude_patterns: [japones, espanol, chino, sleeve, "top ?loader", toploader, binder, sitemap, carrito, my-account]
+  handles: []
+  auto_discover: true
+  discover_every_minutes: 30
+  max_products: 120
+
+polling:
+  interval_seconds: 120
+  jitter_percent: 20
+  concurrency: 1
+  per_request_delay_ms: 800
+  strategies: [json-ld, meta, text]
+
+alerts:
+  min_alert_interval_seconds: 1800
+  alert_on_first_sight: false
+  notify_on_new_product: true
+
+state_file: /opt/toppswatch/data/supercollectors.json
+
+notifications:
+  telegram:
+    enabled: true
+    bot_token: ${TELEGRAM_BOT_TOKEN}
+    chat_id: ${TELEGRAM_CHAT_ID}

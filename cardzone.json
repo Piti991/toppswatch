@@ -1,0 +1,10 @@
+{
+  "name": "CardZone",
+  "base_url": "https://cardzone.es",
+  "collections": ["cartas-pokemon-tcg"],
+  "state_file": "/opt/toppswatch/data/cardzone.json",
+  "interval": 180,
+  "delay": 1.5,
+  "min_alert_interval": 1800,
+  "notify_new": true
+}
